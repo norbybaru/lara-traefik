@@ -1,0 +1,79 @@
+version: '3'
+
+services:
+  # Reverse Proxy
+  reverse-proxy:
+    image: traefik # The official Traefik docker image
+    networks:
+      - proxy
+    command: --api --logLevel=DEBUG --docker.exposedbydefault=false # Enables the web UI and tells Træfik to listen to docker, without exposing by default
+    ports:
+    - "80:80"     # The HTTP port
+    - "8080:8080" # The Web UI (enabled by --api)
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock # So that Traefik can listen to the Docker events
+
+  # Backend Web Server
+  web_server:
+    build: ./docker/nginx/
+    container_name: ${APP_NAME}_web_server
+    labels:
+    - "traefik.enable=true"
+    - "traefik.backend=web"
+    - "traefik.frontend.rule=Host:lara-nova.test"
+    - "traefik.port=80"
+    - "traefik.frontend.passHostHeader=true"
+    working_dir: /var/www/app
+    volumes:
+    - .:/var/www/app
+    depends_on:
+    - app
+    networks:
+    - proxy
+
+  # Application
+  app:
+    build:
+      context: .
+      dockerfile: ./docker/php/Dockerfile
+    container_name: ${APP_NAME}_app
+    environment:
+      APP_ENV: local
+      DB_HOST: db
+      DB_USERNAME: mbnd
+      DB_PASSWORD: secret
+      DB_DATABASE: mbnd
+    labels:
+    - "traefik.enable=false"
+    volumes:
+    - .:/var/www/app
+    depends_on:
+    - db
+    networks:
+    - default
+    - proxy
+
+  # Database
+  db:
+    image: mysql:5.7
+    container_name: ${APP_NAME}_mysql
+    labels:
+    - "traefik.enable=false"
+    ports:
+    - "33061:3306"
+    environment:
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: roam
+      MYSQL_DATABASE: ${DB_DATABASE}
+    volumes:
+    - db_data:/var/lib/mysql
+    networks:
+    - default
+
+networks:
+  default:
+  proxy:
+
+volumes:
+  db_data:
