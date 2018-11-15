@@ -22,6 +22,7 @@ services:
     - "traefik.backend=web"
     - "traefik.frontend.rule=Host:lara-nova.test"
     - "traefik.port=80"
+    - "traefik.docker.network=proxy"
     - "traefik.frontend.passHostHeader=true"
     working_dir: /var/www/app
     volumes:
